@@ -1,16 +1,11 @@
 interface Address {
-	type: 'controller' | 'vehicle' | null;
+	type: 'master' | 'slave' | 'node' | null;
 	id: string | null;
 }
 
-const BROADCAST_TARGET: Readonly<Address> = Object.freeze({
-	type: null,
-	id: null,
-});
-
 const DATA_LIFETIME = 10000;
 
-function writeNetwork(source: Address, target: Address, payload: string) {
+function writeNetwork(source: Address, target: Address | null, payload: string) {
 	const now = Date.now();
 
 	const body = JSON.stringify({
@@ -25,7 +20,7 @@ function writeNetwork(source: Address, target: Address, payload: string) {
 interface NetworkData {
 	at: number;
 	source: Address;
-	target: Address;
+	target: Address | null;
 	payload: string;
 }
 
@@ -81,7 +76,7 @@ class NetworkMessageEvent extends Event {
 	at: number = 0;
 
 	constructor(at: number, source: Address, message: string) {
-		super('mesaage');
+		super('message');
 
 		this.at = at;
 		this.source = source;
@@ -89,7 +84,7 @@ class NetworkMessageEvent extends Event {
 	}
 }
 
-export function useNetwork(localAddress: Address) {
+export function useNetwork(local: Address) {
 	const node = new EventTarget() as EventTarget & {
 		addEventListener(
 			type: 'message',
@@ -97,25 +92,25 @@ export function useNetwork(localAddress: Address) {
 		): void;
 	};
 
-	const connection = {
+	const state = {
 		active: false,
 		consumedAt: 0,
 	};
 
-	function connect() {
-		connection.active = true;
-		connection.consumedAt = Date.now();
+	function open() {
+		state.active = true;
+		state.consumedAt = Date.now();
 
 		requestAnimationFrame(function consumeNetworkData() {
 			const now = Date.now();
 
-			for (const data of networkData(connection.consumedAt)) {
+			for (const data of networkData(state.consumedAt)) {
 				const { at, source, target, payload } = data;
+				const fromLocal = source.id === local.id;
+				const isBroadcast = target === null;
+				const toLocal = !isBroadcast && target.id === local.id;
 
-				if (
-					target.type !== localAddress.type &&
-					target.id !== localAddress.id
-				) {
+				if (fromLocal || (!isBroadcast && !toLocal)) {
 					continue;
 				}
 
@@ -124,25 +119,25 @@ export function useNetwork(localAddress: Address) {
 				node.dispatchEvent(event);
 			}
 
-			connection.consumedAt = now;
+			state.consumedAt = now;
 
-			if (connection.active) {
+			if (state.active) {
 				requestAnimationFrame(consumeNetworkData);
 			}
 		});
 	}
 
-	function disconnnet() {
-		connection.active = false;
+	function close() {
+		state.active = false;
 	}
 
 	async function broadcast(message: string) {
-		writeNetwork(localAddress, BROADCAST_TARGET, message);
+		writeNetwork(local, null, message);
 	}
 
 	async function send(target: Address, message: string) {
-		writeNetwork(localAddress, target, message);
+		writeNetwork(local, target, message);
 	}
 
-	return { node, connect, disconnnet, send, broadcast };
+	return { node, open, close, send, broadcast };
 }
