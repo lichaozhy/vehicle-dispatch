@@ -472,6 +472,37 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 				peer.send({ type: 'master', id: masterId }, message);
 			}
 		},
+		'master-sync-to-primary': (incomingMessage, source) => {
+			const { primary, secondaries } = network.value.topology;
+
+			const message = JSON.stringify({
+				action: 'master-sync-broadcast',
+				...incomingMessage,
+			});
+
+			for (const nodeId of [primary, ...Object.keys(secondaries)]) {
+				if (nodeId === node.value.id) {
+					MessageHandler.node!['master-sync-broadcast']!(
+						incomingMessage,
+						source,
+					);
+				} else {
+					peer.send({ id: nodeId, type: 'node' }, message);
+				}
+			}
+
+		},
+		'master-sync-broadcast': (incomingMessage) => {
+			const message = JSON.stringify({
+				action: 'master-sync-incoming',
+				...incomingMessage,
+			});
+
+			for (const [masterId] of Object.entries(Master.value.record)) {
+				console.log(1111);
+				peer.send({ type: 'master', id: masterId }, message);
+			}
+		},
 	},
 	master: {
 		bind: ({ commander }, source) => {
@@ -485,6 +516,33 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 				at: Date.now(),
 				commander: commander as boolean,
 			};
+		},
+		sync: ({ commander }, source) => {
+			if (network.value.id === null) {
+				return;
+			}
+
+			const messageObject = {
+				masterId: source.id,
+				commander,
+			};
+
+			if (isPrimary.value) {
+				MessageHandler.node!['master-sync-to-primary']!(messageObject, source);
+			} else {
+				const message = JSON.stringify({
+					action: 'master-sync-to-primary',
+					...messageObject,
+				});
+
+				peer.send(
+					{
+						type: 'node',
+						id: network.value.topology.primary,
+					},
+					message,
+				);
+			}
 		},
 	},
 	slave: {

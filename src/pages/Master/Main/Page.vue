@@ -126,6 +126,7 @@
 					</q-list>
 				</q-card-section>
 			</q-card>
+			<div style="font-size: 10px;">{{ Master.record }}</div>
 
 			<q-separator class="q-my-lg"></q-separator>
 
@@ -194,6 +195,27 @@ interface SlaveRegistry {
 	record: Record<string, SlaveAbstract>;
 }
 
+interface SyncRegistry {
+	at: number;
+}
+
+interface MasterAbstract {
+	at: number;
+	commander: boolean;
+}
+
+interface MasterRegistry {
+	pingAt: number;
+	record: Record<string, MasterAbstract>;
+}
+
+function MasterRegistry(): MasterRegistry {
+	return {
+		pingAt: 0,
+		record: {},
+	};
+}
+
 function NetworkConfiguration(): NetworkConfiguration {
 	return {
 		inquiry: false,
@@ -227,6 +249,12 @@ function NodeDetectionRegistry(): NodeDetectionRegistry {
 	};
 }
 
+function SyncRegistry(): SyncRegistry {
+	return {
+		at: 0,
+	};
+}
+
 const bindingDowntime = computed(() => {
 	const duration = localTime.value - binding.value.node.pongAt;
 
@@ -243,6 +271,8 @@ const binding = ref<BindingRegistry>(BindingRegistry());
 const NodeDetection = ref<NodeDetectionRegistry>(NodeDetectionRegistry());
 const Slave = ref<SlaveRegistry>(SlaveRegistry());
 const Network = ref<NetworkConfiguration>(NetworkConfiguration());
+const Sync = ref<SyncRegistry>(SyncRegistry());
+const Master = ref<MasterRegistry>(MasterRegistry());
 
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 	node: {
@@ -272,6 +302,12 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 				masterList: masterList as string[],
 			};
 		},
+		'master-sync-incoming': ({ masterId, commander }) => {
+			Master.value.record[masterId as string] = {
+				at: Date.now(),
+				commander: commander as boolean,
+			};
+		},
 	},
 	master: {},
 	slave: {},
@@ -298,6 +334,12 @@ peer.node.addEventListener('message', ({ source, message }) => {
 });
 
 peer.node.addEventListener('data-seek', () => (localTime.value = Date.now()));
+
+peer.node.addEventListener('data-seek', function releaseTimeoutBinding() {
+	if (localTime.value - binding.value.node.pongAt > 10000) {
+		binding.value = BindingRegistry();
+	}
+});
 
 peer.node.addEventListener('data-seek', function clearTimeoutNode() {
 	for (const [id, { at }] of Object.entries(NodeDetection.value.record)) {
@@ -327,6 +369,26 @@ peer.node.addEventListener('data-seek', async function pingBinding() {
 
 	peer.send({ type: 'node', id: node.id }, PING_MESSAGE);
 	binding.value.pingAt = now;
+});
+
+peer.node.addEventListener('data-seek', function sync() {
+	if (binding.value.node.id === null) {
+		return;
+	}
+
+	if (localTime.value - Sync.value.at < 1000) {
+		return;
+	}
+
+	const { node } = binding.value;
+
+	const message = JSON.stringify({
+		action: 'sync',
+		commander: user.value?.isCommander,
+	});
+
+	peer.send({ type: 'node', id: node.id }, message);
+	Sync.value.at = Date.now();
 });
 
 onMounted(async () => {
