@@ -19,6 +19,7 @@
 			>
 				<q-card-actions class="q-pb-none">
 					<div class="text-h5">链路</div>
+					<div style="font-size: 10px">{{ Network }}</div>
 				</q-card-actions>
 				<q-card-actions>
 					<div class="row q-col-gutter-xs full-width">
@@ -151,6 +152,14 @@ import { MASTER_USER, SET_TITLE } from 'src/Injection';
 import { useNetwork } from 'src/network';
 import AppMasterVirtualNode from './VirtualNode.vue';
 
+interface NetworkConfiguration {
+	inquiry: boolean;
+	race: boolean;
+	commander: number;
+	protocolList: string[];
+	instructionList: string[];
+}
+
 type MessageHandler = (
 	body: { [key: string]: unknown },
 	source: Address,
@@ -183,6 +192,16 @@ interface SlaveAbstract {
 
 interface SlaveRegistry {
 	record: Record<string, SlaveAbstract>;
+}
+
+function NetworkConfiguration(): NetworkConfiguration {
+	return {
+		inquiry: false,
+		race: false,
+		commander: 0,
+		protocolList: [],
+		instructionList: [],
+	};
 }
 
 function BindingRegistry(): BindingRegistry {
@@ -223,14 +242,26 @@ const setTitle = inject(SET_TITLE)!;
 const binding = ref<BindingRegistry>(BindingRegistry());
 const NodeDetection = ref<NodeDetectionRegistry>(NodeDetectionRegistry());
 const Slave = ref<SlaveRegistry>(SlaveRegistry());
+const Network = ref<NetworkConfiguration>(NetworkConfiguration());
 
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 	node: {
+		'network-beacon': ({ id, inquiry, race, commander }) => {
+			if (binding.value.network.id !== id) {
+				return;
+			}
+
+			Object.assign(Network.value, { inquiry, race, commander });
+		},
 		'node-beacon': ({ networkId }, source) => {
 			NodeDetection.value.record[source.id!] = {
 				networkId: networkId as string,
 				at: Date.now(),
 			};
+
+			if (source.id === binding.value.node.id) {
+				binding.value.network.id = networkId as string;
+			}
 		},
 		ping: (_, source) => {
 			binding.value.node = { pongAt: Date.now(), id: source.id! };
