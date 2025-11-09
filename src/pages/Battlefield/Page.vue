@@ -9,13 +9,13 @@
 					<q-btn
 						icon="sports_esports"
 						label="New Master"
-						:to="{ name: 'app.master' }"
+						:to="{ name: 'app.master.authentication' }"
 						target="_blank"
 					></q-btn>
 					<q-btn
 						icon="toys"
 						label="New Slave"
-						:to="{ name: 'app.slave' }"
+						:to="{ name: 'app.slave.authentication' }"
 						target="_blank"
 					></q-btn>
 				</q-card-actions>

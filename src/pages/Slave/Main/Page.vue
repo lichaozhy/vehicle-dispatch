@@ -1,7 +1,239 @@
 <template>
-	<div>Vehicle Main</div>
+	<q-page
+		class="column content-center"
+		padding
+	>
+		<div class="full-width app-max-width">
+			<div class="text-h5">Vehicle Panel</div>
+			<q-input
+				v-model="id"
+				readonly
+				label="ID"
+				dense
+			></q-input>
+			<q-input
+				v-model="master"
+				readonly
+				label="Master Id"
+				dense
+			></q-input>
+
+			<q-card
+				class="q-mt-sm"
+				flat
+				bordered
+			>
+				<q-card-actions class="q-pb-none">
+					<div class="text-h5">Link</div>
+				</q-card-actions>
+				<q-card-actions>
+					<div class="row q-col-gutter-xs full-width">
+						<div class="col-9">
+							<q-input
+								:model-value="binding.node?.id"
+								label="Node Id"
+								dense
+								readonly
+								stack-label
+							></q-input>
+						</div>
+						<div class="col-3">
+							<q-input
+								:model-value="bindingDowntime"
+								label="Downtime"
+								dense
+								readonly
+								stack-label
+							></q-input>
+						</div>
+					</div>
+				</q-card-actions>
+			</q-card>
+
+			<q-card
+				class="q-mt-sm"
+				flat
+				bordered
+			>
+				<q-card-actions class="q-pb-none">
+					<div class="text-h5">Node Detection</div>
+				</q-card-actions>
+				<q-card-section>
+					<q-list
+						bordered
+						separator
+					>
+						<q-item v-if="nodeList.length === 0">
+							<q-item-section> No node </q-item-section>
+						</q-item>
+						<q-item
+							v-for="node in nodeList"
+							:key="node.id"
+						>
+							<q-item-section>
+								<q-item-label>Node Id: {{ node.id }}</q-item-label>
+								<q-item-label caption>
+									Network ID: {{ node.networkId ?? '-' }}
+								</q-item-label>
+								<q-item-label caption>
+									Downtime: {{ localTime - node.at }}
+								</q-item-label>
+							</q-item-section>
+							<q-item-section side>
+								<q-btn
+									label="bind"
+									color="primary"
+									@click="requestBindNode(node.id)"
+								></q-btn>
+							</q-item-section>
+						</q-item>
+					</q-list>
+				</q-card-section>
+			</q-card>
+
+			<q-card
+				class="q-mt-sm"
+				flat
+				bordered
+			>
+				<q-card-actions class="q-pb-none">
+					<div class="text-h5">Instruction History</div>
+				</q-card-actions>
+			</q-card>
+		</div>
+	</q-page>
 </template>
 
 <script setup lang="ts">
+import type { Address } from 'src/network';
+import { computed, onBeforeMount, ref, onBeforeUnmount } from 'vue';
+import { useNetwork } from 'src/network';
+
+interface NodeBeaconAbstract {
+	networkId: string | null;
+	at: number;
+}
+
+interface BindingAbstract {
+	id: string | null;
+	at: number;
+}
+
+interface BindingRegistry {
+	pingAt: number;
+	node: BindingAbstract;
+}
+
+function BindingRegistry() {
+	return {
+		pingAt: 0,
+		node: {
+			id: null,
+			at: 0,
+		},
+	};
+}
+
+const id = ref<string>(crypto.randomUUID());
+const master = ref<string | null>(null);
+const peer = useNetwork({ type: 'slave', id: id.value });
+const nodeRecord = ref<Record<string, NodeBeaconAbstract>>({});
+const localTime = ref<number>(0);
+const binding = ref<BindingRegistry>(BindingRegistry());
+
+const bindingDowntime = computed(() => {
+	const duration = localTime.value - binding.value.node.at;
+
+	return duration > 10000 ? 'Timeout' : duration;
+});
+
+const nodeList = computed(() => {
+	return Object.entries(nodeRecord.value).map(([id, abstract]) => {
+		return { id, ...abstract };
+	});
+});
+
+function requestBindNode(nodeId: string) {
+	peer.send(
+		{
+			type: 'node',
+			id: nodeId,
+		},
+		JSON.stringify({ action: 'bind' }),
+	);
+}
+
+type MessageHandler = (
+	body: { [key: string]: unknown },
+	source: Address,
+) => unknown;
+
+const MessageHandler: Record<string, Record<string, MessageHandler>> = {
+	node: {
+		'node-beacon': ({ networkId }, source) => {
+			nodeRecord.value[source.id!] = {
+				networkId: networkId as string,
+				at: Date.now(),
+			};
+		},
+		ping: (_, source) => {
+			binding.value.node = { at: Date.now(), id: source.id! };
+		},
+	},
+	master: {},
+	slave: {},
+};
+
+peer.node.addEventListener('message', ({ source, message }) => {
+	const { type } = source;
+	const { action, ...body } = JSON.parse(message);
+	const handler = MessageHandler[type!]?.[action as string];
+
+	if (handler !== undefined) {
+		handler(body, source);
+	}
+});
+
+peer.node.addEventListener('data-seek', () => (localTime.value = Date.now()));
+
+peer.node.addEventListener('data-seek', () => {
+	for (const [id, { at }] of Object.entries(nodeRecord.value)) {
+		if (localTime.value - at > 10000) {
+			delete nodeRecord.value[id];
+		}
+	}
+});
+
+peer.node.addEventListener('data-seek', function releaseTimeoutBinding() {
+	if (localTime.value - binding.value.node.at > 10000) {
+		binding.value = BindingRegistry();
+	}
+});
+
+peer.node.addEventListener('data-seek', async function heartbeat() {
+	const { node, pingAt } = binding.value;
+
+	if (node.id === null) {
+		return;
+	}
+
+	const now = Date.now();
+
+	if (now - pingAt < 1000) {
+		return;
+	}
+
+	peer.send({ type: 'node', id: node.id }, '{"action": "ping"}');
+	binding.value.pingAt = now;
+});
+
+onBeforeMount(() => {
+	peer.open();
+});
+
+onBeforeUnmount(() => {
+	peer.close();
+});
+
 defineOptions({ name: 'AppVehicleScopeMainPage' });
 </script>

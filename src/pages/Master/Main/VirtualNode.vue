@@ -17,7 +17,7 @@
 			<q-card-section class="q-pb-none">
 				<div class="text-h6">Node</div>
 			</q-card-section>
-			<q-card-section>
+			<q-card-section class="q-pb-none">
 				<q-input
 					v-model="node.id"
 					readonly
@@ -25,6 +25,32 @@
 					stack-label
 					dense
 				></q-input>
+			</q-card-section>
+
+			<q-card-section class="q-pb-none">
+				<div class="text-h6">Slave Registry</div>
+			</q-card-section>
+			<q-card-section>
+				<q-list
+					bordered
+					separator
+					dense
+				>
+					<q-item v-if="Object.keys(slaveRecord).length === 0">
+						<q-item-section>No Slave</q-item-section>
+					</q-item>
+					<q-item
+						v-for="(slaveItem, slaveId) in slaveRecord"
+						:key="slaveId"
+					>
+						<q-item-section>
+							<q-item-label>{{ slaveId }}</q-item-label>
+							<q-item-label caption>Downtime: {{
+								localTime - slaveItem.at
+							}}</q-item-label>
+						</q-item-section>
+					</q-item>
+				</q-list>
 			</q-card-section>
 		</q-card>
 
@@ -245,20 +271,24 @@ interface NetworkState {
 	at: number;
 }
 
-interface MasterState {
+interface NodeState {
 	id: string | null;
+	beacon: ReturnType<typeof setInterval> | null;
 }
 
-const node = ref<MasterState>({
-	id: crypto.randomUUID(),
-});
-
-const peer = useNetwork({ type: 'node', id: node.value.id });
+interface SlaveAbstract {
+	at: number;
+}
 
 type MessageHandler = (
 	body: { [key: string]: unknown },
 	source: Address,
 ) => unknown;
+
+const node = ref<NodeState>({ id: crypto.randomUUID(), beacon: null });
+const peer = useNetwork({ type: 'node', id: node.value.id });
+const slaveRecord = ref<Record<string, SlaveAbstract>>({});
+const slavePingAt = ref(0);
 
 const networkSearchList = computed<({ id: string } & SearchItem)[]>(() => {
 	const { searchRecord, id: currentId } = network.value;
@@ -267,6 +297,50 @@ const networkSearchList = computed<({ id: string } & SearchItem)[]>(() => {
 		.filter(([id]) => id !== currentId)
 		.map(([id, item]) => ({ id, ...item }));
 });
+
+const downtime = computed(() => {
+	const duration = localTime.value - network.value.at;
+
+	return duration > 10000 ? 'Timeout' : duration;
+});
+
+peer.node.addEventListener('data-seek', function pingSlave() {
+	const now = Date.now();
+
+	if (now - slavePingAt.value < 1000) {
+		return;
+	}
+
+	const PING_MESSAGE = JSON.stringify({ action: 'ping' });
+
+	for (const slaveId of Object.keys(slaveRecord.value)) {
+		peer.send({ type: 'slave', id: slaveId }, PING_MESSAGE);
+	}
+
+	slavePingAt.value = Date.now();
+});
+
+function createNodeBeacon() {
+	destroyNodeBeacon();
+
+	node.value.beacon = setInterval(() => {
+		const BEACON_MESSAGE = JSON.stringify({
+			action: 'node-beacon',
+			networkId: network.value.id,
+		});
+
+		peer.broadcast(BEACON_MESSAGE);
+	}, 1000);
+}
+
+function destroyNodeBeacon() {
+	const { beacon } = node.value;
+
+	if (beacon !== null) {
+		clearInterval(beacon);
+		node.value.beacon = null;
+	}
+}
 
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 	node: {
@@ -289,14 +363,15 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 		},
 	},
 	master: {},
-	slave: {},
+	slave: {
+		bind: (_, source) => {
+			slaveRecord.value[source.id!] = { at: Date.now() };
+		},
+		ping: (_, source) => {
+			slaveRecord.value[source.id!] = { at: Date.now() };
+		},
+	},
 };
-
-const downtime = computed(() => {
-	const duration = localTime.value - network.value.at;
-
-	return duration > 10000 ? 'Timeout' : duration;
-});
 
 peer.node.addEventListener('message', ({ source, message }) => {
 	const { type } = source;
@@ -305,6 +380,14 @@ peer.node.addEventListener('message', ({ source, message }) => {
 
 	if (handler !== undefined) {
 		handler(body, source);
+	}
+});
+
+peer.node.addEventListener('data-seek', function clearTimeoutSlave() {
+	for (const [id, { at }] of Object.entries(slaveRecord.value)) {
+		if (localTime.value - at > 10000) {
+			delete slaveRecord.value[id];
+		}
 	}
 });
 
@@ -333,7 +416,8 @@ peer.node.addEventListener('data-seek', async function sync() {
 			},
 			JSON.stringify({
 				action: 'network-primary-sync',
-				id, topology,
+				id,
+				topology,
 			}),
 		);
 	}
@@ -364,7 +448,7 @@ peer.node.addEventListener('data-seek', async function succeed() {
 	if (top === nodeId) {
 		topology.primary = nodeId;
 		delete topology.secondaries[nodeId];
-		createBeacon();
+		createNetworkBeacon();
 	}
 });
 
@@ -403,11 +487,11 @@ const isPrimary = computed(() => {
 });
 
 function destroyNetwork() {
-	destroyBeacon();
+	destroyNetworkBeacon();
 	network.value = NetworkState();
 }
 
-function destroyBeacon() {
+function destroyNetworkBeacon() {
 	const { beacon } = network.value;
 
 	if (beacon !== null) {
@@ -415,8 +499,8 @@ function destroyBeacon() {
 	}
 }
 
-function createBeacon() {
-	destroyBeacon();
+function createNetworkBeacon() {
+	destroyNetworkBeacon();
 
 	network.value.beacon = setInterval(() => {
 		const {
@@ -447,7 +531,7 @@ function updateNetwork() {
 		},
 	});
 
-	createBeacon();
+	createNetworkBeacon();
 }
 
 const localTime = ref<number>(Date.now());
@@ -478,10 +562,12 @@ async function joinNetworkByNodeId(nodeId: string) {
 
 onMounted(() => {
 	peer.open();
+	createNodeBeacon();
 });
 
 onBeforeUnmount(() => {
 	destroyNetwork();
+	destroyNodeBeacon();
 	peer.close();
 });
 

@@ -67,7 +67,7 @@ onMounted(async () => {
 
 onBeforeMount(async () => {
 	if (user.value === null) {
-		return await router.push({ name: 'app.master' });
+		return await router.push({ name: 'app.master.authentication' });
 	}
 
 	const { name, isCommander } = user.value;
