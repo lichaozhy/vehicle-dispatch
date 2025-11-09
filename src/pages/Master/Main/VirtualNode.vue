@@ -499,7 +499,6 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 			});
 
 			for (const [masterId] of Object.entries(Master.value.record)) {
-				console.log(1111);
 				peer.send({ type: 'master', id: masterId }, message);
 			}
 		},

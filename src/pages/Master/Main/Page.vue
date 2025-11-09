@@ -117,10 +117,20 @@
 								</q-item-label>
 							</q-item-section>
 							<q-item-section side>
-								<q-btn
-									label="控制"
-									color="primary"
-								></q-btn>
+								<div>
+									<q-btn
+									  class="q-ml-xs"
+										label="抢占"
+										color="negative"
+										:disable="!canSeize(slave.masterList)"
+									></q-btn>
+									<q-btn
+									  class="q-ml-xs"
+										label="申请"
+										color="primary"
+										:disable="!canInquiry(slave.masterList)"
+									></q-btn>
+								</div>
 							</q-item-section>
 						</q-item>
 					</q-list>
@@ -274,6 +284,39 @@ const Network = ref<NetworkConfiguration>(NetworkConfiguration());
 const Sync = ref<SyncRegistry>(SyncRegistry());
 const Master = ref<MasterRegistry>(MasterRegistry());
 
+function canInquiry(masterList: string[]) {
+	if (masterList.includes(id.value)) {
+		return false;
+	}
+
+	if (Network.value.inquiry) {
+		if (user.value!.isCommander) {
+			return false;
+		}
+
+		return masterList.length > 0;
+	} else {
+		return false;
+	}
+}
+
+function canSeize(masterList: string[]) {
+	if (masterList.includes(id.value)) {
+		return false;
+	}
+
+	if (Network.value.race) {
+		if (user.value!.isCommander) {
+			return true;
+		}
+
+		return masterList.length === 0;
+	} else {
+		return false;
+	}
+
+}
+
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 	node: {
 		'network-beacon': ({ id, inquiry, race, commander }) => {
@@ -345,6 +388,14 @@ peer.node.addEventListener('data-seek', function clearTimeoutNode() {
 	for (const [id, { at }] of Object.entries(NodeDetection.value.record)) {
 		if (localTime.value - at > 10000) {
 			delete NodeDetection.value.record[id];
+		}
+	}
+});
+
+peer.node.addEventListener('data-seek', function clearTimeoutSlave() {
+	for (const [id, { at }] of Object.entries(Slave.value.record)) {
+		if (localTime.value - at > 10000) {
+			delete Slave.value.record[id];
 		}
 	}
 });
