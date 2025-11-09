@@ -45,9 +45,9 @@
 					>
 						<q-item-section>
 							<q-item-label>{{ id }}</q-item-label>
-							<q-item-label caption>无响应时间: {{
-								localTime - master.at
-							}}</q-item-label>
+							<q-item-label caption
+								>无响应时间: {{ localTime - master.at }}</q-item-label
+							>
 						</q-item-section>
 					</q-item>
 				</q-list>
@@ -71,9 +71,9 @@
 					>
 						<q-item-section>
 							<q-item-label>{{ slaveId }}</q-item-label>
-							<q-item-label caption>无响应时间: {{
-								localTime - slaveItem.at
-							}}</q-item-label>
+							<q-item-label caption
+								>无响应时间: {{ localTime - slaveItem.at }}</q-item-label
+							>
 						</q-item-section>
 					</q-item>
 				</q-list>
@@ -105,7 +105,7 @@
 								label="请求模式"
 								dense
 								readonly
-							  :model-value="network.configuration.inquiry ? '是' : '否'"
+								:model-value="network.configuration.inquiry ? '是' : '否'"
 							></q-input>
 						</div>
 						<div class="col-3">
@@ -113,7 +113,7 @@
 								label="抢占模式"
 								dense
 								readonly
-							  :model-value="network.configuration.race ? '是' : '否'"
+								:model-value="network.configuration.race ? '是' : '否'"
 							></q-input>
 						</div>
 						<div class="col-3">
@@ -197,11 +197,17 @@
 							type="submit"
 						></q-btn>
 						<q-space></q-space>
-						<q-btn
-							label="Import"
-							icon="file_download"
-							color="indigo-10"
-						></q-btn>
+						<q-file
+							dense
+							filled
+							square
+							v-model="file"
+							label="导入"
+						>
+							<template v-slot:prepend>
+								<q-icon name="file_download" />
+							</template>
+						</q-file>
 					</q-toolbar>
 				</q-form>
 			</q-card-section>
@@ -263,7 +269,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue';
 import type { Address } from 'src/network';
 import { useNetwork } from 'src/network';
 
@@ -328,6 +334,7 @@ function MasterRegistry(): MasterRegistry {
 	};
 }
 
+const file = ref<File | null>(null);
 const node = ref<NodeState>({ id: crypto.randomUUID(), beacon: null });
 const peer = useNetwork({ type: 'node', id: node.value.id });
 const slaveRecord = ref<Record<string, SlaveAbstract>>({});
@@ -337,14 +344,23 @@ const Master = ref<MasterRegistry>(MasterRegistry());
 const networkSearchList = computed<({ id: string } & SearchItem)[]>(() => {
 	const { searchRecord } = network.value;
 
-	return Object.entries(searchRecord)
-		.map(([id, item]) => ({ id, ...item }));
+	return Object.entries(searchRecord).map(([id, item]) => ({ id, ...item }));
 });
 
 const downtime = computed(() => {
 	const duration = localTime.value - network.value.at;
 
 	return duration > 10000 ? 'Timeout' : duration;
+});
+
+watch(file, async (file) => {
+	if (file === null) {
+		return;
+	}
+
+	const configuration = JSON.parse(await file.text());
+
+	Object.assign(networkConfiguration.value, configuration);
 });
 
 peer.node.addEventListener('data-seek', function pingSlave() {
@@ -436,7 +452,10 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 
 			for (const nodeId of [primary, ...Object.keys(secondaries)]) {
 				if (nodeId === node.value.id) {
-					MessageHandler.node!['slave-sync-broadcast']!(incomingMessage, source);
+					MessageHandler.node!['slave-sync-broadcast']!(
+						incomingMessage,
+						source,
+					);
 				} else {
 					peer.send({ id: nodeId, type: 'node' }, message);
 				}
@@ -489,9 +508,13 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 					...messageObject,
 				});
 
-				peer.send({
-					type: 'node', id: network.value.topology.primary,
-				}, message);
+				peer.send(
+					{
+						type: 'node',
+						id: network.value.topology.primary,
+					},
+					message,
+				);
 			}
 		},
 	},
