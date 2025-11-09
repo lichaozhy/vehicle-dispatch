@@ -124,6 +124,10 @@ interface BindingRegistry {
 	node: BindingAbstract;
 }
 
+interface SyncRegistry {
+	at: number;
+}
+
 function BindingRegistry() {
 	return {
 		pingAt: 0,
@@ -134,12 +138,19 @@ function BindingRegistry() {
 	};
 }
 
+function SyncRegistry(): SyncRegistry {
+	return {
+		at: 0,
+	};
+}
+
 const id = ref<string>(crypto.randomUUID());
 const master = ref<string | null>(null);
 const peer = useNetwork({ type: 'slave', id: id.value });
 const nodeRecord = ref<Record<string, NodeBeaconAbstract>>({});
 const localTime = ref<number>(0);
 const binding = ref<BindingRegistry>(BindingRegistry());
+const Sync = ref<SyncRegistry>(SyncRegistry());
 
 const bindingDowntime = computed(() => {
 	const duration = localTime.value - binding.value.node.at;
@@ -210,7 +221,7 @@ peer.node.addEventListener('data-seek', function releaseTimeoutBinding() {
 	}
 });
 
-peer.node.addEventListener('data-seek', async function heartbeat() {
+peer.node.addEventListener('data-seek', async function pingBinding() {
 	const { node, pingAt } = binding.value;
 
 	if (node.id === null) {
@@ -225,6 +236,26 @@ peer.node.addEventListener('data-seek', async function heartbeat() {
 
 	peer.send({ type: 'node', id: node.id }, '{"action": "ping"}');
 	binding.value.pingAt = now;
+});
+
+peer.node.addEventListener('data-seek', function sync() {
+	if (binding.value.node.id === null) {
+		return;
+	}
+
+	if (localTime.value - Sync.value.at < 1000) {
+		return;
+	}
+
+	const { node } = binding.value;
+
+	const message = JSON.stringify({
+		action: 'sync',
+		masterList: [],
+	});
+
+	peer.send({ type: 'node', id: node.id }, message);
+	Sync.value.at = Date.now();
 });
 
 onBeforeMount(() => {

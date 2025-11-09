@@ -12,14 +12,6 @@
 				dense
 			></q-input>
 
-			<q-input
-				v-model="binding.network.id"
-				readonly
-				label="Network"
-				stack-label
-				dense
-			></q-input>
-
 			<q-card
 				class="q-mt-sm"
 				flat
@@ -93,6 +85,19 @@
 				</q-card-section>
 			</q-card>
 
+			<q-card
+				class="q-mt-sm"
+				flat
+				bordered
+			>
+				<q-card-actions class="q-pb-none">
+					<div class="text-h5">Slave</div>
+				</q-card-actions>
+				<q-card-section>
+					{{ Slave.record }}
+				</q-card-section>
+			</q-card>
+
 			<q-separator class="q-my-lg"></q-separator>
 
 			<app-master-virtual-node></app-master-virtual-node>
@@ -143,6 +148,15 @@ interface NodeDetectionRegistry {
 	record: Record<string, NodeDetectionAbstract>;
 }
 
+interface SlaveAbstract {
+	at: number;
+	masterList: string[];
+}
+
+interface SlaveRegistry {
+	record: Record<string, SlaveAbstract>;
+}
+
 function BindingRegistry(): BindingRegistry {
 	return {
 		pingAt: 0,
@@ -154,6 +168,10 @@ function BindingRegistry(): BindingRegistry {
 			id: null,
 		},
 	};
+}
+
+function SlaveRegistry(): SlaveRegistry {
+	return { record: {} };
 }
 
 function NodeDetectionRegistry(): NodeDetectionRegistry {
@@ -176,6 +194,7 @@ const user = inject(MASTER_USER)!;
 const setTitle = inject(SET_TITLE)!;
 const binding = ref<BindingRegistry>(BindingRegistry());
 const NodeDetection = ref<NodeDetectionRegistry>(NodeDetectionRegistry());
+const Slave = ref<SlaveRegistry>(SlaveRegistry());
 
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 	node: {
@@ -187,6 +206,12 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 		},
 		ping: (_, source) => {
 			binding.value.node = { pongAt: Date.now(), id: source.id! };
+		},
+		'slave-sync-incoming': ({ slaveId, masterList }) => {
+			Slave.value.record[slaveId as string] = {
+				at: Date.now(),
+				masterList: masterList as string[],
+			};
 		},
 	},
 	master: {},

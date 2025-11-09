@@ -30,7 +30,7 @@
 			<q-card-section class="q-pb-none">
 				<div class="text-h6">Master Registry</div>
 			</q-card-section>
-			<q-card-section>
+			<q-card-section class="q-pb-none">
 				<q-list
 					bordered
 					separator
@@ -421,6 +421,33 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 			network.value.id = id as string;
 			network.value.topology = topology as NetworkTopology;
 		},
+		'slave-sync-to-primary': (incomingMessage, source) => {
+			const { primary, secondaries } = network.value.topology;
+
+			const message = JSON.stringify({
+				action: 'slave-sync-broadcast',
+				...incomingMessage,
+			});
+
+			for (const nodeId of [primary, ...Object.keys(secondaries)]) {
+				if (nodeId === node.value.id) {
+					MessageHandler.node!['slave-sync-broadcast']!(incomingMessage, source);
+				} else {
+					peer.send({ id: nodeId, type: 'node' }, message);
+				}
+			}
+		},
+		// To all master
+		'slave-sync-broadcast': (incomingMessage) => {
+			const message = JSON.stringify({
+				action: 'slave-sync-incoming',
+				...incomingMessage,
+			});
+
+			for (const [masterId] of Object.entries(Master.value.record)) {
+				peer.send({ type: 'master', id: masterId }, message);
+			}
+		},
 	},
 	master: {
 		bind: ({ commander }, source) => {
@@ -442,6 +469,25 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 		},
 		ping: (_, source) => {
 			slaveRecord.value[source.id!] = { at: Date.now() };
+		},
+		sync: ({ masterList }, source) => {
+			const messageObject = {
+				slaveId: source.id,
+				masterList,
+			};
+
+			if (isPrimary.value) {
+				MessageHandler.node!['slave-sync-to-primary']!(messageObject, source);
+			} else {
+				const message = JSON.stringify({
+					action: 'slave-sync-to-primary',
+					...messageObject,
+				});
+
+				peer.send({
+					type: 'node', id: network.value.topology.primary,
+				}, message);
+			}
 		},
 	},
 };
