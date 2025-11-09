@@ -1,11 +1,15 @@
-interface Address {
+export interface Address {
 	type: 'master' | 'slave' | 'node' | null;
 	id: string | null;
 }
 
 const DATA_LIFETIME = 10000;
 
-function writeNetwork(source: Address, target: Address | null, payload: string) {
+function writeNetwork(
+	source: Address,
+	target: Address | null,
+	payload: string,
+) {
 	const now = Date.now();
 
 	const body = JSON.stringify({
@@ -14,7 +18,9 @@ function writeNetwork(source: Address, target: Address | null, payload: string) 
 		payload,
 	});
 
-	localStorage.setItem(`${now}`, body);
+	const nonce = Math.trunc(Math.random() * 1000);
+
+	localStorage.setItem(`${now}-${nonce}`, body);
 }
 
 interface NetworkData {
@@ -23,6 +29,8 @@ interface NetworkData {
 	target: Address | null;
 	payload: string;
 }
+
+const KEY_REG = /(\d+)-(\d+)/;
 
 function* networkData(since: number): Generator<NetworkData, void, unknown> {
 	const length = localStorage.length;
@@ -41,7 +49,13 @@ function* networkData(since: number): Generator<NetworkData, void, unknown> {
 	}
 
 	for (const key of keyList) {
-		const at = Number(key);
+		const matched = key.match(KEY_REG);
+
+		if (matched === null) {
+			return;
+		}
+
+		const at = Number(matched[1]);
 
 		if (isNaN(at) || !Number.isInteger(at)) {
 			continue;
@@ -89,7 +103,11 @@ export function useNetwork(local: Address) {
 		addEventListener(
 			type: 'message',
 			listener: (event: NetworkMessageEvent) => unknown,
-		): void;
+		): unknown;
+		addEventListener(
+			type: 'data-seek',
+			listener: (event: Event) => unknown,
+		): unknown;
 	};
 
 	const state = {
@@ -120,6 +138,7 @@ export function useNetwork(local: Address) {
 			}
 
 			state.consumedAt = now;
+			node.dispatchEvent(new Event('data-seek'));
 
 			if (state.active) {
 				requestAnimationFrame(consumeNetworkData);

@@ -51,9 +51,9 @@ const setTitle = inject(SET_TITLE)!;
 const network = useNetwork({ type: 'master', id: id.value });
 const node = ref<string | null>(null);
 
-network.node.addEventListener('message', e => {
-	// console.log(e);
-});
+// network.node.addEventListener('message', e => {
+// 	// console.log(e);
+// });
 
 onMounted(async () => {
 	network.open();
