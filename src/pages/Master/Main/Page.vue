@@ -4,7 +4,7 @@
 		padding
 	>
 		<div class="full-width app-max-width">
-			<div class="text-h5">Control Panel</div>
+			<div class="text-h5">控制端面板</div>
 			<q-input
 				v-model="id"
 				readonly
@@ -18,14 +18,14 @@
 				bordered
 			>
 				<q-card-actions class="q-pb-none">
-					<div class="text-h5">Link</div>
+					<div class="text-h5">链路</div>
 				</q-card-actions>
 				<q-card-actions>
 					<div class="row q-col-gutter-xs full-width">
 						<div class="col-9">
 							<q-input
 								:model-value="binding.node.id"
-								label="Node Id"
+								label="节点Id"
 								dense
 								readonly
 								stack-label
@@ -34,7 +34,7 @@
 						<div class="col-3">
 							<q-input
 								:model-value="bindingDowntime"
-								label="Downtime"
+								label="无响应时间"
 								dense
 								readonly
 								stack-label
@@ -50,7 +50,7 @@
 				bordered
 			>
 				<q-card-actions class="q-pb-none">
-					<div class="text-h5">Node Detection</div>
+					<div class="text-h5">节点探测</div>
 				</q-card-actions>
 				<q-card-section>
 					<q-list
@@ -58,24 +58,24 @@
 						separator
 					>
 						<q-item v-if="Object.keys(NodeDetection.record).length === 0">
-							<q-item-section> No node </q-item-section>
+							<q-item-section>没有节点 </q-item-section>
 						</q-item>
 						<q-item
 							v-for="(node, id) in NodeDetection.record"
 							:key="id"
 						>
 							<q-item-section>
-								<q-item-label>Node Id: {{ id }}</q-item-label>
+								<q-item-label>节点ID: {{ id }}</q-item-label>
 								<q-item-label caption>
-									Network ID: {{ node.networkId ?? '-' }}
+									网络ID: {{ node.networkId ?? '-' }}
 								</q-item-label>
 								<q-item-label caption>
-									Downtime: {{ localTime - node.at }}
+									无响应时间: {{ localTime - node.at }}
 								</q-item-label>
 							</q-item-section>
 							<q-item-section side>
 								<q-btn
-									label="bind"
+									label="接入"
 									color="primary"
 									@click="requestBindNode(id)"
 								></q-btn>
@@ -91,10 +91,38 @@
 				bordered
 			>
 				<q-card-actions class="q-pb-none">
-					<div class="text-h5">Slave</div>
+					<div class="text-h5">车辆列表</div>
 				</q-card-actions>
 				<q-card-section>
-					{{ Slave.record }}
+					<q-list
+						bordered
+						separator
+						dense
+					>
+						<q-item v-if="Object.keys(Slave.record).length === 0">
+							<q-item-section> 没有车辆 </q-item-section>
+						</q-item>
+						<q-item
+							v-for="(slave, id) in Slave.record"
+							:key="id"
+						>
+							<q-item-section>
+								<q-item-label>车辆Id: {{ id }}</q-item-label>
+								<q-item-label caption>
+									无响应时间: {{ localTime - slave.at }}
+								</q-item-label>
+								<q-item-label caption>
+									控制端: {{ slave.masterList }}
+								</q-item-label>
+							</q-item-section>
+							<q-item-section side>
+								<q-btn
+									label="控制"
+									color="primary"
+								></q-btn>
+							</q-item-section>
+						</q-item>
+					</q-list>
 				</q-card-section>
 			</q-card>
 
@@ -281,7 +309,7 @@ onBeforeMount(async () => {
 
 	const { name, isCommander } = user.value;
 
-	setTitle(`${isCommander ? 'Commander ' : ''}Master - ${name}`);
+	setTitle(`${isCommander ? '指挥官 ' : ''}控制端 - ${name}`);
 });
 
 onBeforeUnmount(() => {

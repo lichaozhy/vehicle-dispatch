@@ -4,19 +4,15 @@
 		padding
 	>
 		<div class="full-width app-max-width">
-			<div class="text-h5">Vehicle Panel</div>
+			<div class="text-h5">车辆面板</div>
 			<q-input
 				v-model="id"
 				readonly
 				label="ID"
 				dense
 			></q-input>
-			<q-input
-				v-model="master"
-				readonly
-				label="Master Id"
-				dense
-			></q-input>
+
+			控制端：{{ Object.keys(masters) }}
 
 			<q-card
 				class="q-mt-sm"
@@ -24,14 +20,14 @@
 				bordered
 			>
 				<q-card-actions class="q-pb-none">
-					<div class="text-h5">Link</div>
+					<div class="text-h5">链路</div>
 				</q-card-actions>
 				<q-card-actions>
 					<div class="row q-col-gutter-xs full-width">
 						<div class="col-9">
 							<q-input
 								:model-value="binding.node?.id"
-								label="Node Id"
+								label="节点Id"
 								dense
 								readonly
 								stack-label
@@ -40,7 +36,7 @@
 						<div class="col-3">
 							<q-input
 								:model-value="bindingDowntime"
-								label="Downtime"
+								label="无响应时间"
 								dense
 								readonly
 								stack-label
@@ -56,7 +52,7 @@
 				bordered
 			>
 				<q-card-actions class="q-pb-none">
-					<div class="text-h5">Node Detection</div>
+					<div class="text-h5">节点探测</div>
 				</q-card-actions>
 				<q-card-section>
 					<q-list
@@ -64,24 +60,24 @@
 						separator
 					>
 						<q-item v-if="nodeList.length === 0">
-							<q-item-section> No node </q-item-section>
+							<q-item-section>没有节点</q-item-section>
 						</q-item>
 						<q-item
 							v-for="node in nodeList"
 							:key="node.id"
 						>
 							<q-item-section>
-								<q-item-label>Node Id: {{ node.id }}</q-item-label>
+								<q-item-label>节点Id: {{ node.id }}</q-item-label>
 								<q-item-label caption>
-									Network ID: {{ node.networkId ?? '-' }}
+									网络ID: {{ node.networkId ?? '-' }}
 								</q-item-label>
 								<q-item-label caption>
-									Downtime: {{ localTime - node.at }}
+									无响应时间: {{ localTime - node.at }}
 								</q-item-label>
 							</q-item-section>
 							<q-item-section side>
 								<q-btn
-									label="bind"
+									label="接入"
 									color="primary"
 									@click="requestBindNode(node.id)"
 								></q-btn>
@@ -97,7 +93,7 @@
 				bordered
 			>
 				<q-card-actions class="q-pb-none">
-					<div class="text-h5">Instruction History</div>
+					<div class="text-h5">指令历史</div>
 				</q-card-actions>
 			</q-card>
 		</div>
@@ -145,7 +141,7 @@ function SyncRegistry(): SyncRegistry {
 }
 
 const id = ref<string>(crypto.randomUUID());
-const master = ref<string | null>(null);
+const masters = ref<Record<string, true>>({});
 const peer = useNetwork({ type: 'slave', id: id.value });
 const nodeRecord = ref<Record<string, NodeBeaconAbstract>>({});
 const localTime = ref<number>(0);

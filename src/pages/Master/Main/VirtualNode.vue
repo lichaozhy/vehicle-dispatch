@@ -1,11 +1,11 @@
 <template>
 	<div>
 		<div class="text-h5">
-			Virtual Node
+			虚拟中心节点
 			<q-badge
 				align="top"
 				:color="isPrimary ? 'primary' : 'secondary'"
-				>{{ isPrimary ? 'Primary' : 'Secondary' }}</q-badge
+				>{{ isPrimary ? '主要' : '从属' }}</q-badge
 			>
 		</div>
 
@@ -15,20 +15,20 @@
 			bordered
 		>
 			<q-card-section class="q-pb-none">
-				<div class="text-h6">Node</div>
+				<div class="text-h6">节点</div>
 			</q-card-section>
 			<q-card-section class="q-pb-none">
 				<q-input
 					v-model="node.id"
 					readonly
-					label="Node ID"
+					label="节点ID"
 					stack-label
 					dense
 				></q-input>
 			</q-card-section>
 
 			<q-card-section class="q-pb-none">
-				<div class="text-h6">Master Registry</div>
+				<div class="text-h6">控制端表</div>
 			</q-card-section>
 			<q-card-section class="q-pb-none">
 				<q-list
@@ -37,7 +37,7 @@
 					dense
 				>
 					<q-item v-if="Object.keys(Master.record).length === 0">
-						<q-item-section>No Master</q-item-section>
+						<q-item-section>没有控制端</q-item-section>
 					</q-item>
 					<q-item
 						v-for="(master, id) in Master.record"
@@ -45,7 +45,7 @@
 					>
 						<q-item-section>
 							<q-item-label>{{ id }}</q-item-label>
-							<q-item-label caption>Downtime: {{
+							<q-item-label caption>无响应时间: {{
 								localTime - master.at
 							}}</q-item-label>
 						</q-item-section>
@@ -54,7 +54,7 @@
 			</q-card-section>
 
 			<q-card-section class="q-pb-none">
-				<div class="text-h6">Slave Registry</div>
+				<div class="text-h6">车辆表</div>
 			</q-card-section>
 			<q-card-section>
 				<q-list
@@ -63,7 +63,7 @@
 					dense
 				>
 					<q-item v-if="Object.keys(slaveRecord).length === 0">
-						<q-item-section>No Slave</q-item-section>
+						<q-item-section>没有车辆</q-item-section>
 					</q-item>
 					<q-item
 						v-for="(slaveItem, slaveId) in slaveRecord"
@@ -71,7 +71,7 @@
 					>
 						<q-item-section>
 							<q-item-label>{{ slaveId }}</q-item-label>
-							<q-item-label caption>Downtime: {{
+							<q-item-label caption>无响应时间: {{
 								localTime - slaveItem.at
 							}}</q-item-label>
 						</q-item-section>
@@ -86,7 +86,7 @@
 			bordered
 		>
 			<q-card-section class="q-pb-none">
-				<div class="text-h6">Current Network</div>
+				<div class="text-h6">当前网络</div>
 			</q-card-section>
 			<q-card-section class="q-pb-none">
 				<q-form @submit.prevent="updateNetwork">
@@ -95,40 +95,40 @@
 							<q-input
 								v-model="network.id"
 								readonly
-								label="Network ID"
+								label="网络ID"
 								stack-label
 								dense
 							></q-input>
 						</div>
 						<div class="col-3">
-							<q-select
-								label="Inquiry Mode"
+							<q-input
+								label="请求模式"
 								dense
 								readonly
-								v-model="networkConfiguration.inquiry"
-							></q-select>
-						</div>
-						<div class="col-3">
-							<q-select
-								label="Race Mode"
-								dense
-								readonly
-								v-model="networkConfiguration.race"
-							></q-select>
+							  :model-value="network.configuration.inquiry ? '是' : '否'"
+							></q-input>
 						</div>
 						<div class="col-3">
 							<q-input
-								label="Commander"
+								label="抢占模式"
+								dense
+								readonly
+							  :model-value="network.configuration.race ? '是' : '否'"
+							></q-input>
+						</div>
+						<div class="col-3">
+							<q-input
+								label="指挥官数量"
 								dense
 								readonly
 								stack-label
 								type="number"
-								v-model="networkConfiguration.commander"
+								v-model="network.configuration.commander"
 							></q-input>
 						</div>
 						<div class="col-3">
 							<q-input
-								label="Downtime"
+								label="无响应时间"
 								dense
 								readonly
 								stack-label
@@ -139,7 +139,7 @@
 					<q-toolbar class="q-px-none">
 						<q-btn
 							class="q-mr-xs"
-							label="Destroy"
+							label="退出网络"
 							icon="cancel"
 							color="negative"
 							:disable="network.id === null"
@@ -159,28 +159,28 @@
 			bordered
 		>
 			<q-card-section class="q-pb-none">
-				<div class="text-h6">Create & Configurate Network from Local</div>
+				<div class="text-h6">从本地创建并配置主网络</div>
 			</q-card-section>
 			<q-card-section class="q-pb-none">
 				<q-form @submit.prevent="updateNetwork">
 					<div class="row q-col-gutter-xs">
 						<div class="col-4">
-							<q-select
-								label="Inquiry Mode"
+							<q-toggle
+								label="请求模式"
 								dense
 								v-model="networkConfiguration.inquiry"
-							></q-select>
+							></q-toggle>
 						</div>
 						<div class="col-4">
-							<q-select
-								label="Race Mode"
+							<q-toggle
+								label="抢占模式"
 								dense
 								v-model="networkConfiguration.race"
-							></q-select>
+							></q-toggle>
 						</div>
 						<div class="col-4">
 							<q-input
-								label="Commander"
+								label="指挥官数量"
 								dense
 								stack-label
 								type="number"
@@ -191,8 +191,8 @@
 					<q-toolbar class="q-px-none">
 						<q-btn
 							class="q-mr-xs"
-							label="Update"
-							icon="refresh"
+							label="创建新网络"
+							icon="wifi"
 							color="primary"
 							type="submit"
 						></q-btn>
@@ -212,7 +212,7 @@
 			bordered
 		>
 			<q-card-section class="q-pb-none">
-				<div class="text-h6">Searching...</div>
+				<div class="text-h6">网络搜索</div>
 			</q-card-section>
 
 			<q-card-section>
@@ -221,24 +221,24 @@
 					separator
 				>
 					<q-item v-if="networkSearchList.length === 0">
-						<q-item-section> No network </q-item-section>
+						<q-item-section>无网络</q-item-section>
 					</q-item>
 					<q-item
 						v-for="item in networkSearchList"
 						:key="item.id"
 					>
 						<q-item-section>
-							<q-item-label>Network Id: {{ item.id }}</q-item-label>
+							<q-item-label>网络Id: {{ item.id }}</q-item-label>
 							<q-item-label caption>
 								<q-badge
 									v-if="item.inquiry"
 									color="primary"
-									>inquiry</q-badge
+									>请求模式</q-badge
 								>
 								<q-badge
 									v-if="item.race"
 									color="negative"
-									>race</q-badge
+									>抢占模式</q-badge
 								>
 								<q-badge
 									color="grey"
@@ -250,7 +250,7 @@
 						</q-item-section>
 						<q-item-section side>
 							<q-btn
-								label="Join"
+								label="加入网络"
 								color="primary"
 								@click="joinNetworkByNodeId(item.node)"
 							></q-btn>
@@ -335,10 +335,9 @@ const slavePingAt = ref(0);
 const Master = ref<MasterRegistry>(MasterRegistry());
 
 const networkSearchList = computed<({ id: string } & SearchItem)[]>(() => {
-	const { searchRecord, id: currentId } = network.value;
+	const { searchRecord } = network.value;
 
 	return Object.entries(searchRecord)
-		.filter(([id]) => id !== currentId)
 		.map(([id, item]) => ({ id, ...item }));
 });
 
@@ -412,6 +411,12 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 				race: race as boolean,
 				commander: commander as number,
 			};
+
+			if (id === network.value.id) {
+				network.value.configuration.inquiry = inquiry as boolean;
+				network.value.configuration.race = race as boolean;
+				network.value.configuration.commander = commander as number;
+			}
 		},
 		'network-join-request': (_, source) => {
 			network.value.topology.secondaries[source.id!] = Date.now();
@@ -644,6 +649,9 @@ function updateNetwork() {
 
 	Object.assign(network.value, {
 		id: crypto.randomUUID(),
+		configuration: {
+			...networkConfiguration.value,
+		},
 		topology: {
 			primary: node.value.id,
 			secondaries: {},
