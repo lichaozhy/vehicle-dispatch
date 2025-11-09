@@ -28,6 +28,32 @@
 			</q-card-section>
 
 			<q-card-section class="q-pb-none">
+				<div class="text-h6">Master Registry</div>
+			</q-card-section>
+			<q-card-section>
+				<q-list
+					bordered
+					separator
+					dense
+				>
+					<q-item v-if="Object.keys(Master.record).length === 0">
+						<q-item-section>No Master</q-item-section>
+					</q-item>
+					<q-item
+						v-for="(master, id) in Master.record"
+						:key="id"
+					>
+						<q-item-section>
+							<q-item-label>{{ id }}</q-item-label>
+							<q-item-label caption>Downtime: {{
+								localTime - master.at
+							}}</q-item-label>
+						</q-item-section>
+					</q-item>
+				</q-list>
+			</q-card-section>
+
+			<q-card-section class="q-pb-none">
 				<div class="text-h6">Slave Registry</div>
 			</q-card-section>
 			<q-card-section>
@@ -280,15 +306,33 @@ interface SlaveAbstract {
 	at: number;
 }
 
+interface MasterAbstract {
+	at: number;
+	commander: boolean;
+}
+
+interface MasterRegistry {
+	pingAt: number;
+	record: Record<string, MasterAbstract>;
+}
+
 type MessageHandler = (
 	body: { [key: string]: unknown },
 	source: Address,
 ) => unknown;
 
+function MasterRegistry(): MasterRegistry {
+	return {
+		pingAt: 0,
+		record: {},
+	};
+}
+
 const node = ref<NodeState>({ id: crypto.randomUUID(), beacon: null });
 const peer = useNetwork({ type: 'node', id: node.value.id });
 const slaveRecord = ref<Record<string, SlaveAbstract>>({});
 const slavePingAt = ref(0);
+const Master = ref<MasterRegistry>(MasterRegistry());
 
 const networkSearchList = computed<({ id: string } & SearchItem)[]>(() => {
 	const { searchRecord, id: currentId } = network.value;
@@ -318,6 +362,22 @@ peer.node.addEventListener('data-seek', function pingSlave() {
 	}
 
 	slavePingAt.value = Date.now();
+});
+
+peer.node.addEventListener('data-seek', function pingMaster() {
+	const now = Date.now();
+
+	if (now - Master.value.pingAt < 1000) {
+		return;
+	}
+
+	const PING_MESSAGE = JSON.stringify({ action: 'ping' });
+
+	for (const masterId of Object.keys(Master.value.record)) {
+		peer.send({ type: 'master', id: masterId }, PING_MESSAGE);
+	}
+
+	Master.value.pingAt = Date.now();
 });
 
 function createNodeBeacon() {
@@ -362,7 +422,20 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 			network.value.topology = topology as NetworkTopology;
 		},
 	},
-	master: {},
+	master: {
+		bind: ({ commander }, source) => {
+			Master.value.record[source.id!] = {
+				at: Date.now(),
+				commander: commander as boolean,
+			};
+		},
+		ping: ({ commander }, source) => {
+			Master.value.record[source.id!] = {
+				at: Date.now(),
+				commander: commander as boolean,
+			};
+		},
+	},
 	slave: {
 		bind: (_, source) => {
 			slaveRecord.value[source.id!] = { at: Date.now() };

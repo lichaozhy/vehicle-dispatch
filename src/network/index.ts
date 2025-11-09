@@ -3,7 +3,7 @@ export interface Address {
 	id: string | null;
 }
 
-const DATA_LIFETIME = 10000;
+const DATA_LIFETIME = 3000;
 
 function writeNetwork(
 	source: Address,
