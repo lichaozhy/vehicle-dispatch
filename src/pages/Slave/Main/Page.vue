@@ -102,8 +102,9 @@
 
 <script setup lang="ts">
 import type { Address } from 'src/network';
-import { computed, onBeforeMount, ref, onBeforeUnmount } from 'vue';
+import { computed, onBeforeMount, ref, onBeforeUnmount, inject } from 'vue';
 import { useNetwork } from 'src/network';
+import { SET_TITLE } from 'src/Injection';
 
 interface NodeBeaconAbstract {
 	networkId: string | null;
@@ -291,5 +292,6 @@ onBeforeUnmount(() => {
 	peer.close();
 });
 
+inject(SET_TITLE)!('车辆端');
 defineOptions({ name: 'AppVehicleScopeMainPage' });
 </script>

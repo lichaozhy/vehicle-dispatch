@@ -7,13 +7,13 @@
 			<q-form @submit="updateAndToMain">
 				<q-input
 					v-model="username"
-					label="Username"
+					label="用户名"
 					autocomplete="off"
 				/>
 
 				<q-checkbox
 					v-model="isCommander"
-					label="As Commander"
+					label="作为指挥官"
 				/>
 
 				<q-toolbar>
@@ -21,7 +21,7 @@
 					<q-btn
 						type="submit"
 						color="primary"
-						label="Authenticate"
+						label="认证"
 						:disable="!isFormValid"
 					></q-btn>
 					<q-space></q-space>
@@ -56,6 +56,6 @@ async function updateAndToMain() {
 	});
 }
 
-inject(SET_TITLE)!('Master Authentication');
+inject(SET_TITLE)!('控制端认证');
 defineOptions({ name: 'AppControllerScopeAuthenticationPage' });
 </script>

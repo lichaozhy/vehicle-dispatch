@@ -10,7 +10,7 @@
 					<q-btn
 						type="submit"
 						color="primary"
-						label="Authenticate"
+						label="认证"
 					></q-btn>
 					<q-space></q-space>
 				</q-toolbar>
@@ -32,6 +32,6 @@ async function updateAndToMain() {
 	});
 }
 
-inject(SET_TITLE)!('Slave Authentication');
+inject(SET_TITLE)!('车辆端认证');
 defineOptions({ name: 'AppVehicleScopeAuthenticationPage' });
 </script>
