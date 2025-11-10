@@ -135,6 +135,7 @@
 										label="申请"
 										color="primary"
 										:disable="!canInquiry(slave.masterList)"
+										@click="inquiry(slaveId)"
 									></q-btn>
 								</div>
 							</q-item-section>
@@ -163,6 +164,7 @@ import {
 	computed,
 } from 'vue';
 
+import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 
 import { MASTER_USER, SET_TITLE } from 'src/Injection';
@@ -277,6 +279,7 @@ const bindingDowntime = computed(() => {
 	return duration > 10000 ? 'Timeout' : duration;
 });
 
+const $q = useQuasar();
 const localTime = ref<number>(0);
 const id = ref<string>(crypto.randomUUID());
 const peer = useNetwork({ type: 'master', id: id.value });
@@ -332,6 +335,30 @@ function assign(slaveId: string) {
 	peer.send({ type: 'slave', id: slaveId }, message);
 }
 
+function inquiry(slaveId: string) {
+	if (!canInquiry(Slave.value.record[slaveId]!.masterList)) {
+		return;
+	}
+
+	const commanderList = [];
+
+	for (const [masterId, { commander }] of Object.entries(Master.value.record)) {
+		if (masterId !== id.value && commander) {
+			commanderList.push(masterId);
+		}
+	}
+
+	for (const masterId of commanderList) {
+		const message = JSON.stringify({
+			action: 'inquiry',
+			master: id.value,
+			slave: slaveId,
+		});
+
+		peer.send({ type: 'master', id: masterId }, message);
+	}
+}
+
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 	node: {
 		'network-beacon': ({ id, inquiry, race, commander }) => {
@@ -367,7 +394,23 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 			};
 		},
 	},
-	master: {},
+	master: {
+		inquiry: ({ slave, master }) => {
+			if (!user.value?.isCommander) {
+				return;
+			}
+
+			$q.dialog({
+				title: '控制权申请',
+				message: `由${master as string}控制${slave as string}是否同意？`,
+				cancel: true,
+			}).onOk(() => {
+				const message = JSON.stringify({ action: 'assign', master });
+
+				peer.send({ type: 'slave', id: slave as string }, message);
+			});
+		},
+	},
 	slave: {},
 };
 
