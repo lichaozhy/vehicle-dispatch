@@ -12,7 +12,7 @@
 				dense
 			></q-input>
 
-			控制端：{{ Object.keys(masters) }}
+			控制端：{{ Object.keys(Master.record) }}
 
 			<q-card
 				class="q-mt-sm"
@@ -124,6 +124,14 @@ interface SyncRegistry {
 	at: number;
 }
 
+interface MasterAbstract {
+	at: number;
+}
+
+interface MasterRegistry {
+	record: Record<string, MasterAbstract>;
+}
+
 function BindingRegistry() {
 	return {
 		pingAt: 0,
@@ -140,13 +148,19 @@ function SyncRegistry(): SyncRegistry {
 	};
 }
 
+function MasterRegistry(): MasterRegistry {
+	return {
+		record: {},
+	};
+}
+
 const id = ref<string>(crypto.randomUUID());
-const masters = ref<Record<string, true>>({});
 const peer = useNetwork({ type: 'slave', id: id.value });
 const nodeRecord = ref<Record<string, NodeBeaconAbstract>>({});
 const localTime = ref<number>(0);
 const binding = ref<BindingRegistry>(BindingRegistry());
 const Sync = ref<SyncRegistry>(SyncRegistry());
+const Master = ref<MasterRegistry>(MasterRegistry());
 
 const bindingDowntime = computed(() => {
 	const duration = localTime.value - binding.value.node.at;
@@ -187,7 +201,22 @@ const MessageHandler: Record<string, Record<string, MessageHandler>> = {
 			binding.value.node = { at: Date.now(), id: source.id! };
 		},
 	},
-	master: {},
+	master: {
+		assign: ({ master }) => {
+			Master.value.record = {
+				[master as string]: {
+					at: Date.now(),
+				},
+			};
+		},
+		ping: (_, source) => {
+			const abstract = Master.value.record[source.id!];
+
+			if (abstract) {
+				abstract.at = Date.now();
+			}
+		},
+	},
 	slave: {},
 };
 
@@ -247,7 +276,7 @@ peer.node.addEventListener('data-seek', function sync() {
 
 	const message = JSON.stringify({
 		action: 'sync',
-		masterList: [],
+		masterList: Object.keys(Master.value.record),
 	});
 
 	peer.send({ type: 'node', id: node.id }, message);

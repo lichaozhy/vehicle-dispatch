@@ -104,11 +104,11 @@
 							<q-item-section> 没有车辆 </q-item-section>
 						</q-item>
 						<q-item
-							v-for="(slave, id) in Slave.record"
-							:key="id"
+							v-for="(slave, slaveId) in Slave.record"
+							:key="slaveId"
 						>
 							<q-item-section>
-								<q-item-label>车辆Id: {{ id }}</q-item-label>
+								<q-item-label>车辆Id: {{ slaveId }}</q-item-label>
 								<q-item-label caption>
 									无响应时间: {{ localTime - slave.at }}
 								</q-item-label>
@@ -118,14 +118,20 @@
 							</q-item-section>
 							<q-item-section side>
 								<div>
+									<q-badge
+										class="q-ml-xs"
+										v-if="slave.masterList.includes(id)"
+										>控制中</q-badge
+									>
 									<q-btn
-									  class="q-ml-xs"
+										class="q-ml-xs"
 										label="抢占"
 										color="negative"
 										:disable="!canSeize(slave.masterList)"
+										@click="assign(slaveId)"
 									></q-btn>
 									<q-btn
-									  class="q-ml-xs"
+										class="q-ml-xs"
 										label="申请"
 										color="primary"
 										:disable="!canInquiry(slave.masterList)"
@@ -136,7 +142,7 @@
 					</q-list>
 				</q-card-section>
 			</q-card>
-			<div style="font-size: 10px;">{{ Master.record }}</div>
+			<div style="font-size: 10px">{{ Master.record }}</div>
 
 			<q-separator class="q-my-lg"></q-separator>
 
@@ -314,7 +320,16 @@ function canSeize(masterList: string[]) {
 	} else {
 		return false;
 	}
+}
 
+function assign(slaveId: string) {
+	if (!canSeize(Slave.value.record[slaveId]!.masterList)) {
+		return;
+	}
+
+	const message = JSON.stringify({ action: 'assign', master: id.value });
+
+	peer.send({ type: 'slave', id: slaveId }, message);
 }
 
 const MessageHandler: Record<string, Record<string, MessageHandler>> = {
